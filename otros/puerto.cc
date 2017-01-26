@@ -1,4 +1,3 @@
-/*
 #include "puerto.h"
 
 Port::Port(const char *debugName)
@@ -46,4 +45,3 @@ void Port::Receive(int *mensaje)
 	puedeLeer = false;
 	puerto_lock->Release();
 }
-*/

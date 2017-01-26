@@ -1,0 +1,4 @@
+La inverisón de prioridades no puede hacerse con los semaforos ya que al momento en que un proceso
+queda bloqueado, no se sabe cual será el proceso que lo despertará y por lo tanto, no podemos
+aumentarle la prioridad.
+Con un lock es distinto, ya que cuando un lock esta tomado, sabemos quien es el "dueño". 

@@ -202,7 +202,6 @@ ThreadTest()
 
 */
 
-/*
 // ###### TESTEO PUERTOS ########
 
 Port *testPort = new Port ("testPort");
@@ -274,81 +273,11 @@ ThreadTest()
 {
     DEBUG('t', "Entering SimpleTest");
 
-    Thread *test1 = new Thread ("envia", false);
-    Thread *test1b = new Thread ("envia2", false);
-    Thread *test2 = new Thread ("recibe", false);
+    Thread *test1 = new Thread ("envia");
+    Thread *test1b = new Thread ("envia2");
+    Thread *test2 = new Thread ("recibe");
     test1 -> Fork (SendThread, (void*)"envia");
     test1b -> Fork (SendThread2, (void*)"envia2");
     test2 -> Fork (ReceiveThread, (void*)"recibe");
     
 }
-
-*/
-
-/*
-void impnombre(void* name){
-    // Reinterpret arg "name" as a string
-    char* ss = (char*)name;
-    currentThread->Join();
-    for(int i=1; i<=6; i++) {
-        printf("escribe %s \n",ss);
-        currentThread->Yield();
-    }
-    
-}
-
-void impnombrep3(void* name){
-    // Reinterpret arg "name" as a string
-    char* ss = (char*)name;
-    for(int i=1; i<=6; i++) {
-        printf("escribe %s \n",ss);
-        currentThread->Yield();
-    }
-    
-}
-
-*/
-
-
-void
-SimpleThread(void* name)
-{
-    // Reinterpret arg "name" as a string
-    char* threadName = (char*)name;
-    
-    // If the lines dealing with interrupts are commented,
-    // the code will behave incorrectly, because
-    // printf execution may cause race conditions.
-    for (int num = 0; num < 10; num++) {
-        //IntStatus oldLevel = interrupt->SetLevel(IntOff);
-	printf("*** thread %s looped %d times\n", threadName, num);
-	//interrupt->SetLevel(oldLevel);
-        //currentThread->Yield();
-    }
-    //IntStatus oldLevel = interrupt->SetLevel(IntOff);
-    printf(">>> Thread %s has finished\n", threadName);
-    //interrupt->SetLevel(oldLevel);
-}
-
-//----------------------------------------------------------------------
-// ThreadTest
-// 	Set up a ping-pong between several threads, by launching
-//	ten threads which call SimpleThread, and finally calling 
-//	SimpleThread ourselves.
-//----------------------------------------------------------------------
-
-void
-ThreadTest()
-{
-    DEBUG('t', "Entering SimpleTest");
-
-    for ( int k=1; k<=10; k++) {
-      char* threadname = new char[100];
-      sprintf(threadname, "Hilo %d", k);
-      Thread* newThread = new Thread (threadname, false,k);
-      newThread->Fork (SimpleThread, (void*)threadname);
-    }
-    
-    SimpleThread( (void*)"Hilo 0");
-}
-

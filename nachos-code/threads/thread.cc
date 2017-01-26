@@ -32,16 +32,43 @@ const unsigned STACK_FENCEPOST = 0xdeadbeef;
 //	"threadName" is an arbitrary string, useful for debugging.
 //----------------------------------------------------------------------
 
-Thread::Thread(const char* threadName)
+Thread::Thread(const char* threadName, bool joinable, int prio)
 {
     name = threadName;
     stackTop = NULL;
     stack = NULL;
     status = JUST_CREATED;
+    join = joinable;
+    puertoJoin = new Port("puerto join");
+    prioridad=prio;
+    prioridadOriginal=prio;
+    
+    
 #ifdef USER_PROGRAM
     space = NULL;
 #endif
 }
+
+
+Thread::Thread(const char* threadName, bool joinable)
+{
+    name = threadName;
+    stackTop = NULL;
+    stack = NULL;
+    status = JUST_CREATED;
+    join = joinable;
+    puertoJoin = new Port("puerto join");
+    prioridad=5;
+    prioridadOriginal=5;
+    
+    
+#ifdef USER_PROGRAM
+    space = NULL;
+#endif
+    
+}
+
+
 
 //----------------------------------------------------------------------
 // Thread::~Thread
@@ -62,6 +89,8 @@ Thread::~Thread()
     ASSERT(this != currentThread);
     if (stack != NULL)
 	DeallocBoundedArray((char *) stack, StackSize * sizeof(HostMemoryAddress));
+	
+	delete puertoJoin;
 }
 
 //----------------------------------------------------------------------
@@ -149,6 +178,8 @@ Thread::Finish ()
     interrupt->SetLevel(IntOff);		
     ASSERT(this == currentThread);
     
+    if (join)
+        puertoJoin->Send(1);
     DEBUG('t', "Finishing thread \"%s\"\n", getName());
     
     threadToBeDestroyed = currentThread;
@@ -310,3 +341,35 @@ Thread::RestoreUserState()
 	machine->WriteRegister(i, userRegisters[i]);
 }
 #endif
+
+
+//// JOIN
+
+void
+Thread::Join()
+{
+    ASSERT(join);
+    int i;
+    puertoJoin->Receive(&i);
+}
+
+
+// PRIORIDADES E INVERSION DE PRIORIDADES
+int
+Thread::ObtenerPrioridad()
+{
+    return prioridad;
+}
+
+int
+Thread::ObtenerPrioridadOriginal()
+{
+    return prioridadOriginal;
+}
+
+void
+Thread::ModificarPrioridad(int p)
+{
+    prioridad=p;
+}
+

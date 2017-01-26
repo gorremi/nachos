@@ -1,9 +1,7 @@
-/* 
-
 #include <synch.h>
 
 
-class Port_
+class Port
 {
         public:
                 Port(const char * debugName);
@@ -21,4 +19,3 @@ class Port_
                 bool puedeEscribir;
                 int buffer;
 };
-*/

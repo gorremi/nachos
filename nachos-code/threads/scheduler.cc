@@ -29,7 +29,11 @@
 
 Scheduler::Scheduler()
 { 
-    readyList = new List<Thread*>; 
+    int i;
+    readyList = new List<Thread*>* [MAXP];
+    for (i=0;i<=MAXP;i++){
+        readyList[i]=new List<Thread*>;
+    }
 } 
 
 //----------------------------------------------------------------------
@@ -53,10 +57,12 @@ Scheduler::~Scheduler()
 void
 Scheduler::ReadyToRun (Thread *thread)
 {
+    int pri;
     DEBUG('t', "Putting thread %s on ready list.\n", thread->getName());
-
+    pri=thread->ObtenerPrioridad();
     thread->setStatus(READY);
-    readyList->Append(thread);
+    
+    readyList[pri]->Append(thread);
 }
 
 //----------------------------------------------------------------------
@@ -70,7 +76,11 @@ Scheduler::ReadyToRun (Thread *thread)
 Thread *
 Scheduler::FindNextToRun ()
 {
-    return readyList->Remove();
+    int i;
+    for (i=MAXP; i>=0;i--){
+    if (!(readyList[i]->IsEmpty()))
+        return readyList[i]->Remove();
+    }
 }
 
 //----------------------------------------------------------------------
@@ -148,6 +158,43 @@ ThreadPrint (Thread* t) {
 void
 Scheduler::Print()
 {
+    int i;
     printf("Ready list contents:\n");
-    readyList->Apply(ThreadPrint);
+    for(i=0;i<=MAXP;i++){
+        printf("LISTA PRIORIDAD %i: \n",i);
+        readyList[i]->Apply(ThreadPrint);
+        printf("\n");
+    }
 }
+
+void
+Scheduler::Reubicar(Thread* thr)
+{
+    int prioNueva;
+    int prioOrig;
+    
+    List<Thread*>* temporal;
+    temporal = new List<Thread*>;
+    
+    Thread* t;
+    
+    prioNueva = thr -> ObtenerPrioridad();
+    prioOrig = thr -> ObtenerPrioridadOriginal();
+    
+    while(!(readyList[prioOrig]->IsEmpty())){
+        t = readyList[prioOrig]->Remove();
+        if (t == thr)
+            break;
+        temporal->Append(t);
+    }
+    
+    readyList[prioNueva]->Append(thr);
+    
+    while(!(temporal->IsEmpty())){
+        t = temporal->Remove();
+        readyList[prioOrig]->Append(t);
+    }
+    
+    
+}
+

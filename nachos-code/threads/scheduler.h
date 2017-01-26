@@ -6,6 +6,9 @@
 // All rights reserved.  See copyright.h for copyright notice and limitation 
 // of liability and disclaimer of warranty provisions.
 
+//Prioridad Maxima
+#define MAXP 10
+
 #ifndef SCHEDULER_H
 #define SCHEDULER_H
 
@@ -28,8 +31,11 @@ class Scheduler {
     void Run(Thread* nextThread);	// Cause nextThread to start running
     void Print();			// Print contents of ready list
     
+    //PARA INVERSION DE PRIORIDADES
+    void Reubicar(Thread* thr);
+    
   private:
-    List<Thread*> *readyList;  		// queue of threads that are ready to run,
+    List<Thread*> **readyList;  		// queue of threads that are ready to run,
 					// but not running
 };
 

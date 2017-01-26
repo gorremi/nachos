@@ -105,10 +105,12 @@ Lock::Lock(const char* debugName) {
 	name = debugName;
 	semLock = new Semaphore (name,1);
 	tieneLock = NULL;
+	semPrio = new Semaphore ("invPrio",1);
 }
 	
 Lock::~Lock() {
 	delete semLock;
+	delete semPrio;
 }
 	
 
@@ -120,12 +122,42 @@ bool Lock::isHeldByCurrentThread() {
 }
 
 void Lock::Acquire() {
+	
+	int prioridadDuenio;
+	int prioridadSolicitante;
+	
 	ASSERT (!isHeldByCurrentThread());
+	
+	
+	semPrio->P();
+	if(tieneLock != NULL){
+		prioridadSolicitante = currentThread->ObtenerPrioridad();
+		prioridadDuenio = tieneLock->ObtenerPrioridad();
+	
+		if (prioridadDuenio<prioridadSolicitante){
+			tieneLock->ModificarPrioridad(prioridadSolicitante);
+			scheduler->Reubicar(tieneLock);
+		}
+	}
+	semPrio->V();
+	
 	semLock -> P();
 	tieneLock = currentThread;
 }
-void Lock::Release() {
+
+
+void Lock::Release() 
+{
 	ASSERT (isHeldByCurrentThread());
+	int prioActual;
+	int prioOrig;
+	
+	prioActual = currentThread->ObtenerPrioridad();
+	prioOrig = currentThread->ObtenerPrioridadOriginal();
+	
+	if (prioActual != prioOrig)
+		currentThread->ModificarPrioridad(prioOrig);
+	
 	tieneLock = NULL;
 	semLock -> V();
 
@@ -163,3 +195,48 @@ void Condition::Broadcast() {
 }
 
 
+Port::Port(const char *debugName)
+{
+	name = debugName;
+	puerto_lock = new Lock(debugName);
+	cond_send = new Condition(debugName , puerto_lock);
+	cond_receive = new Condition(debugName , puerto_lock);
+	leido = false;
+	puedeLeer=false;
+	puedeEscribir=true;
+}
+
+Port::~Port()
+{
+	delete puerto_lock;
+	delete cond_send;
+	delete cond_receive;
+}
+       
+void Port::Send(int mensaje)
+{
+	puerto_lock->Acquire();
+	while(!puedeEscribir)
+		cond_receive->Wait();
+	buffer = mensaje;
+	puedeEscribir = false;
+	puedeLeer = true;
+	cond_send->Signal();
+	while(!leido)
+		cond_receive->Wait();
+	leido = false;
+    puerto_lock->Release();
+}
+
+void Port::Receive(int *mensaje)
+{
+	puerto_lock->Acquire();
+	while(!puedeLeer)
+			cond_send->Wait();
+	*mensaje = buffer;
+	puedeEscribir = true;
+	leido = true;
+	cond_receive->Broadcast();
+	puedeLeer = false;
+	puerto_lock->Release();
+}
