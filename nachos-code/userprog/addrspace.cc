@@ -20,6 +20,9 @@
 #include "addrspace.h"
 #include "noff.h"
 
+#include <string.h>
+#include "readwritemem.h"
+
 //----------------------------------------------------------------------
 // SwapHeader
 // 	Do little endian to big endian conversion on the bytes in the 
@@ -86,7 +89,11 @@ AddrSpace::AddrSpace(OpenFile *executable)
     pageTable = new TranslationEntry[numPages];
     for (i = 0; i < numPages; i++) {
 	pageTable[i].virtualPage = i;	// for now, virtual page # = phys page #
-	pageTable[i].physicalPage = i;
+	//pageTable[i].physicalPage = i;
+	int plibre;
+	plibre = pagLibres->Find();
+	ASSERT(plibre != -1);
+	pageTable[i].physicalPage = plibre;
 	pageTable[i].valid = true;
 	pageTable[i].use = false;
 	pageTable[i].dirty = false;
@@ -122,7 +129,12 @@ AddrSpace::AddrSpace(OpenFile *executable)
 
 AddrSpace::~AddrSpace()
 {
-   delete pageTable;
+    int i;
+  
+    for (i = 0; i < (int) numPages; i++)
+        pagLibres->Clear(pageTable[i].physicalPage); 
+   
+    delete pageTable;
 }
 
 //----------------------------------------------------------------------
@@ -181,3 +193,57 @@ void AddrSpace::RestoreState()
     machine->pageTable = pageTable;
     machine->pageTableSize = numPages;
 }
+
+// Para argumentos en Exec
+
+
+void AddrSpace::WriteArgs(int argc,char **args){
+    
+    DEBUG('e', "Writing command line arguments into child process.\n");
+    
+    int *addr = new int[argc];
+    int i;
+    int sp = machine->ReadRegister(StackReg);
+        
+    for (i = 0; i < argc; i++){
+        sp -= strlen(args[i]) + 1;
+        WriteStringToUser(args[i], sp);
+        addr[i] = sp;    
+    }
+    
+    // Alineamos la pila a múltiplo de cuatro.  
+    sp -= sp % 4;
+    // Hacemos lugar para el arreglo y el último NULL.
+    sp -= 4 * argc + 4;
+      
+    for (i = 0; i < argc; i++){
+        machine->WriteMem(sp, 4, addr[i]);
+        sp += 4;
+    }
+      
+    machine->WriteMem(sp, 4, 0);
+      
+    sp -= (4 * argc);
+    sp -= 16;
+    machine->WriteRegister(StackReg, sp); 
+    machine->WriteRegister(4, argc); 
+    machine->WriteRegister(5, sp);
+      
+    delete[] addr;
+    
+    for (i = 0; i < argc; i++){
+        delete args[i];
+    }
+    delete args;
+
+}
+
+
+
+
+
+
+
+
+
+

@@ -34,6 +34,9 @@ SynchDisk   *synchDisk;
 
 #ifdef USER_PROGRAM	// requires either FILESYS or FILESYS_STUB
 Machine *machine;	// user program memory and registers
+SynchConsole* synchConsole;
+ProcessTable* processTable;
+BitMap* pagLibres; 
 #endif
 
 #ifdef NETWORK
@@ -178,6 +181,9 @@ Initialize(int argc, char **argv)
     
 #ifdef USER_PROGRAM
     machine = new Machine(debugUserProg);	// this must come first
+    synchConsole = new SynchConsole(NULL, NULL);
+    processTable = new ProcessTable();
+    pagLibres = new BitMap(NumPhysPages);
 #endif
 
 #ifdef FILESYS
@@ -212,6 +218,9 @@ Cleanup()
     
 #ifdef USER_PROGRAM
     delete machine;
+    delete synchConsole;
+    delete processTable;
+    delete pagLibres;
 #endif
 
 #ifdef FILESYS_NEEDED

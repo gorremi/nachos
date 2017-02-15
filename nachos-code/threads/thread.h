@@ -45,7 +45,13 @@ class Port;
 #ifdef USER_PROGRAM
 #include "machine.h"
 #include "addrspace.h"
+
+#define MAX_TABLA_OP_FILES 1024
+#include "filesys.h"
+
 #endif
+
+#include <map>
 
 // CPU register state to be saved on context switch.  
 // x86 processors needs 9 32-bit registers, whereas x64 has 8 extra registers
@@ -110,10 +116,14 @@ class Thread {
     void ModificarPrioridad(int prio);
     
     
+    void setExStatus(int ex){ exitStatus = ex; }
+    int getExStatus(){ return exitStatus; }
+    
     
   private:
     
-		
+		int exitStatus;
+			
     // some of the private data for this class is listed above
     
     HostMemoryAddress* stack; 		// Bottom of the stack 
@@ -134,6 +144,7 @@ class Thread {
 		int prioridad;
 		// PARA INVERSION DE PRIORIDADES
 		int prioridadOriginal;
+		
 
 #ifdef USER_PROGRAM
 // A thread running a user program actually has *two* sets of CPU registers -- 
@@ -141,12 +152,20 @@ class Thread {
 // while executing kernel code.
 
     int userRegisters[NumTotalRegs];	// user-level CPU register state
+    
+    // TABLA DE ARCHIVOS ABIERTOS
+    std::map<int, OpenFile*> tablaOpFiles;
 
   public:
     void SaveUserState();		// save user-level register state
     void RestoreUserState();		// restore user-level register state
 
     AddrSpace *space;			// User code this thread is running.
+    
+    // PARA ADMINISTRAR LA TABLA DE ARCHIVOS ABIERTOS
+    int AddFile(OpenFile* op);
+    OpenFile* GetFile(int fd);
+    void RemoveFile(int fd);
 #endif
 };
 

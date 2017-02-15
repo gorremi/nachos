@@ -25,6 +25,12 @@
 #include "system.h"
 #include "syscall.h"
 
+#include "readwritemem.h"
+#include <string.h>
+
+
+
+
 //----------------------------------------------------------------------
 // ExceptionHandler
 // 	Entry point into the Nachos kernel.  Called when a user program
@@ -48,16 +54,237 @@
 //	are in machine.h.
 //----------------------------------------------------------------------
 
+#define MAX_ARGS 32
+#define MAX_ARG_LEN 128
+
+
+
+void incrementarPC(){
+    int pc = machine->ReadRegister(PCReg);
+    machine->WriteRegister(PrevPCReg, pc);
+    pc = machine->ReadRegister(NextPCReg);
+    machine->WriteRegister(PCReg, pc);
+    machine->WriteRegister(NextPCReg, pc + 4);
+    
+}
+
+struct Arg_WriteArgs{
+        int c;
+        char **v;
+};
+
+void startProc(void *arg) {
+  currentThread->space->InitRegisters();
+  currentThread->space->RestoreState();
+  
+  struct Arg_WriteArgs *a = (Arg_WriteArgs*) arg;
+  currentThread->space->WriteArgs(a->c,a->v);
+  machine->Run();
+}
+
+
+
 void
 ExceptionHandler(ExceptionType which)
 {
     int type = machine->ReadRegister(2);
+    
+    DEBUG('e',"Excepcion %d \n",type);
 
-    if ((which == SyscallException) && (type == SC_Halt)) {
-	DEBUG('a', "Shutdown, initiated by user program.\n");
-   	interrupt->Halt();
+    if (which == SyscallException) {
+        switch(type){
+            case SC_Halt:{
+                DEBUG('a', "Shutdown, initiated by user program.\n");
+   	            interrupt->Halt();
+   	            break;
+                }
+            case SC_Create:{
+                int filenameAddr = machine->ReadRegister(4);
+                char* filename = new char[128];
+                ReadStringFromUser(filenameAddr, filename);
+                fileSystem->Create(filename, 0);
+                delete filename;
+                incrementarPC();
+                }
+            case SC_Read:{
+                int buffAddr = machine -> ReadRegister(4);
+                int size = machine -> ReadRegister(5);
+                OpenFileId fd = machine -> ReadRegister(6);
+                
+                char* buffer = new char[size];
+                int i;
+                
+                if (fd == ConsoleOutput){
+                    DEBUG('e',"Error: llamo a leer con ConsoleOutput \n");
+                    machine -> WriteRegister(2,-1); // Error porque llamó a leer
+                    incrementarPC();
+                    break;
+                } else if(fd == ConsoleInput){
+                        for(i=0;i<size;i++){
+                         buffer[i]= synchConsole->GetChar();   
+                        }
+                    } else{
+                        OpenFile* of = currentThread->GetFile(fd);
+                        if(of == NULL){
+                            DEBUG('e',"Error: open file NULL \n");
+                            machine -> WriteRegister(2,-1);
+                            incrementarPC();
+                            break;  
+                        }
+                        i = of -> Read(buffer, size);
+                    }
+                
+                machine -> WriteRegister(2,i);
+                WriteBufferToUser(buffer,buffAddr,i);
+                delete[] buffer;
+                incrementarPC();
+                break;
+            }
+            case SC_Write:{
+                int buffAddr = machine -> ReadRegister(4);
+                int size = machine -> ReadRegister(5);
+                OpenFileId fd = machine -> ReadRegister(6);
+                char* buffer = new char[size];
+                
+                DEBUG('e',"FD %d \n",fd);
+                
+                if (fd == ConsoleInput){
+                    DEBUG('e',"Error: llamo a escribir con ConsoleInput \n");
+                    machine -> WriteRegister(2,-1); // Error porque llamó a escribir
+                    incrementarPC();
+                    break;
+                }
+                
+                ReadBufferFromUser(buffAddr,buffer,size);
+                
+                if (fd == ConsoleOutput){
+                    DEBUG('e',"consoleOutput \n");
+                    for (int i=0; i<size;i++)
+                        synchConsole -> PutChar(buffer[i]);
+                } else{
+                    OpenFile* of = currentThread->GetFile(fd);
+                    if(of == NULL){
+                        DEBUG('e',"Error: open file NULL \n");
+                        machine -> WriteRegister(2,-1); // Error porque llamó a escribir
+                        incrementarPC();
+                        break;  
+                    }
+                    of->Write(buffer, size);
+                }
+                
+                incrementarPC();
+                delete[] buffer;
+                break;
+                
+            }
+            case SC_Open:{
+                int fileAddr = machine->ReadRegister(4);
+                char* name = new char[128];
+                
+                ReadStringFromUser(fileAddr, name);
+                
+                OpenFile* of = fileSystem->Open(name);
+                
+                delete[] name;
+                
+                if (of == NULL) {
+                    DEBUG('e',"Error: open file NULL \n");
+                    machine -> WriteRegister(2,-1);
+                    incrementarPC();
+                    break;
+                } else {
+                    OpenFileId fd = currentThread->AddFile(of);
+                    machine->WriteRegister(2, fd);
+                    incrementarPC();
+                    break;
+                }
+                
+            }
+            case SC_Close:{
+                OpenFileId fd = machine->ReadRegister(4);
+                currentThread->RemoveFile(fd);
+                incrementarPC();
+                break;
+                
+            }
+            case SC_Exit:{
+                int ex = machine->ReadRegister(4);
+                currentThread->setExStatus(ex);
+                currentThread->Finish();
+                incrementarPC();
+                break;
+            }
+            case SC_Join:{
+                int id = machine->ReadRegister(4);
+                Thread* thread = processTable->GetProcess(id);
+                if(thread == NULL){
+                    DEBUG('e',"Error: thread NULL \n");
+                    machine -> WriteRegister(2,-1);
+                    incrementarPC();
+                    break;
+                } else{
+                    int ex = thread->getExStatus();
+                    machine->WriteRegister(2, ex);
+                    thread->Join();
+                    incrementarPC();
+                    break;
+                }
+            }
+            case SC_Exec:{
+                int fileAddr = machine->ReadRegister(4);
+       	        int argsAddr = machine->ReadRegister(5);
+       	        
+       	        char** args = new char* [MAX_ARGS];
+       	        char* name = new char[128];
+       	        
+       	        ReadStringFromUser(fileAddr, name);
+       	        OpenFile *of = fileSystem->Open(name);
+       	        
+       	        if(of == NULL){
+       	            DEBUG('e',"Error en Exec: Open File NULL \n");
+                    machine -> WriteRegister(2,-1);
+                    incrementarPC();
+                    break;
+       	            
+       	        } else { 
+       	              int i = 0, a;
+           	          
+           	          if (argsAddr != 0){
+           	              for(i = 0; i < MAX_ARGS; i++){
+                 	            machine->ReadMem(argsAddr + 4 * i, 4, &a);
+                 	            if (a == 0)
+                 	              break;
+                 	            char temp[MAX_ARG_LEN];
+                 	            ReadStringFromUser(a, temp);
+                 	            args[i] = new char [strlen(temp) + 1];
+                 	            strcpy(args[i], temp);
+             	          }
+             	        }
+           	          
+           	          AddrSpace *s = new AddrSpace(of);
+           	          Thread *t = new Thread(name, 0);
+        
+           	          t->space = s;
+           	          
+           	          
+           	          struct Arg_WriteArgs *arguParaWriteArgs = new struct Arg_WriteArgs;
+                      arguParaWriteArgs->c = i;
+                      arguParaWriteArgs->v = args;
+           	          
+           	          t->Fork(startProc, arguParaWriteArgs);
+           	          int id = processTable->AddProcess(t);
+           	          machine->WriteRegister(2, id);
+           	        
+           	        incrementarPC();
+           	        break;
+       	        }
+            }
+            
+        }
     } else {
 	printf("Unexpected user mode exception %d %d\n", which, type);
 	ASSERT(false);
     }
 }
+
+

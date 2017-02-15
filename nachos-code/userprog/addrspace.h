@@ -18,6 +18,8 @@
 
 #define UserStackSize		1024 	// increase this as necessary!
 
+#define MAX_ARGS  32
+
 class AddrSpace {
   public:
     AddrSpace(OpenFile *executable);	// Create an address space,
@@ -30,8 +32,13 @@ class AddrSpace {
 
     void SaveState();			// Save/restore address space-specific
     void RestoreState();		// info on a context switch 
+    
+    
+    void WriteArgs(int argc,char **args);
+    
 
   private:
+	  
     TranslationEntry *pageTable;	// Assume linear page table translation
 					// for now!
     unsigned int numPages;		// Number of pages in the virtual 

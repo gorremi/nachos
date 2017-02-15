@@ -42,10 +42,14 @@ Thread::Thread(const char* threadName, bool joinable, int prio)
     puertoJoin = new Port("puerto join");
     prioridad=prio;
     prioridadOriginal=prio;
+    exitStatus=0;
     
     
 #ifdef USER_PROGRAM
     space = NULL;
+    if (processTable) {
+        processTable->AddProcess(this);
+    }
 #endif
 }
 
@@ -60,10 +64,14 @@ Thread::Thread(const char* threadName, bool joinable)
     puertoJoin = new Port("puerto join");
     prioridad=5;
     prioridadOriginal=5;
+    exitStatus=0;
     
     
 #ifdef USER_PROGRAM
     space = NULL;
+    if (processTable) {
+        processTable->AddProcess(this);
+    }
 #endif
     
 }
@@ -179,8 +187,13 @@ Thread::Finish ()
     ASSERT(this == currentThread);
     
     if (join)
-        puertoJoin->Send(1);
+        puertoJoin->Send(exitStatus);
     DEBUG('t', "Finishing thread \"%s\"\n", getName());
+    
+#ifdef USER_PROGRAM
+    int id = processTable->GetID(this);
+    processTable->RemoveProcess(id);
+#endif    
     
     threadToBeDestroyed = currentThread;
     Sleep();					// invokes SWITCH
@@ -373,3 +386,30 @@ Thread::ModificarPrioridad(int p)
     prioridad=p;
 }
 
+#ifdef USER_PROGRAM
+
+int Thread::AddFile(OpenFile* of) {
+    
+    int fd; //fileDescriptor
+    
+    for (fd = 2; fd < MAX_TABLA_OP_FILES; fd++) {
+        if (tablaOpFiles[fd] == NULL) {
+            tablaOpFiles[fd] = of;
+            return fd;
+        }
+    }
+    return -1;
+}
+
+OpenFile* Thread::GetFile(int fd) {
+    return tablaOpFiles[fd];
+}
+
+
+void Thread::RemoveFile(int fd) {
+    OpenFile* openFile = Thread::GetFile(fd);
+    delete openFile;
+    tablaOpFiles[fd] = NULL;
+}
+
+#endif
