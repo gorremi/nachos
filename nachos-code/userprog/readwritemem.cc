@@ -13,7 +13,7 @@ void ReadStringFromUser(int userAddress, char *outString){
     int aux;
     int i=0;
     while(true){
-        if(!machine->ReadMem(userAddress+i,1,&aux)) 
+        if(!machine->ReadMem(userAddress+i,1,&aux))
             ASSERT(machine->ReadMem(userAddress+i,1,&aux));
         outString[i] = aux;
         if(aux==0) 

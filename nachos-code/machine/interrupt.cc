@@ -245,6 +245,39 @@ Interrupt::Halt()
     Cleanup();     // Never returns.
 }
 
+//----------------------------------------------------------------------------------------
+// RestarTicks
+// Restart the total ticks statistic and the pending interrupts list.
+//
+// This function helps to fix the nachos ticks's bug. After some time (when totalTicks
+// reach the maximun positive number) nachos will schedule a pending interrupt at a
+// negative time, after that, it hangs.
+//----------------------------------------------------------------------------------------
+
+#ifdef DFS_TICKS_FIX
+
+void Interrupt::RestartTicks()
+{
+    PendingInterrupt *i = NULL;
+    int newWhen, oldWhen = 0;
+
+    List<PendingInterrupt*> *oldPending = pending;
+    pending = new List<PendingInterrupt*>;
+
+    while ((i = oldPending->SortedRemove(&oldWhen)) != NULL)
+    {
+        newWhen = oldWhen - stats->totalTicks;
+        pending->SortedInsert(i, newWhen);
+        DEBUG('x', "[%s]: Interrupt at time %d re-scheduled at new time %d.\n",
+              __FUNCTION__, oldWhen, newWhen);
+    }
+
+    delete oldPending;
+    stats->totalTicks = 0;
+    stats->numBugFix += 1;
+}
+
+#endif
 //----------------------------------------------------------------------
 // Interrupt::Schedule
 // 	Arrange for the CPU to be interrupted when simulated time
@@ -265,6 +298,17 @@ void
 Interrupt::Schedule(VoidFunctionPtr handler, void* arg, int fromNow, IntType type)
 {
     int when = stats->totalTicks + fromNow;
+#ifdef DFS_TICKS_FIX
+    if (when < 0)
+    {
+        DEBUG('x', "[%s]: WARNING - Fixing ticks bug...\n", __FUNCTION__);
+        RestartTicks();
+        when = fromNow;
+    }
+#else
+    // This assert terminates Nachos if the ticks overflowed
+    ASSERT(when >= 0);
+#endif
     PendingInterrupt *toOccur = new PendingInterrupt(handler, arg, when, type);
 
     DEBUG('i', "Scheduling interrupt handler the %s at time = %d\n", 

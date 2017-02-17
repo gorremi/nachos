@@ -15,6 +15,11 @@
 
 #include "copyright.h"
 
+//Para exec
+
+#define MAX_ARGS 6
+#define MAX_ARG_LEN 128
+
 /* system call codes -- used by the stubs to tell the kernel which system call
  * is being asked for
  */
@@ -57,7 +62,7 @@ typedef int SpaceId;
 /* Run the executable, stored in the Nachos file "name", and return the 
  * address space identifier
  */
-SpaceId Exec(char *name);
+SpaceId Exec(char *name, int cantArg, char **argv);
  
 /* Only return once the the user program "id" has finished.  
  * Return the exit status.

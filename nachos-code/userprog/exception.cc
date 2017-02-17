@@ -54,9 +54,6 @@
 //	are in machine.h.
 //----------------------------------------------------------------------
 
-#define MAX_ARGS 32
-#define MAX_ARG_LEN 128
-
 
 
 void incrementarPC(){
@@ -79,6 +76,9 @@ void startProc(void *arg) {
   
   struct Arg_WriteArgs *a = (Arg_WriteArgs*) arg;
   currentThread->space->WriteArgs(a->c,a->v);
+  
+  delete a;
+        
   machine->Run();
 }
 
@@ -89,7 +89,7 @@ ExceptionHandler(ExceptionType which)
 {
     int type = machine->ReadRegister(2);
     
-    DEBUG('e',"Excepcion %d \n",type);
+    DEBUG('e',"Excepcion %d wich %d \n",type,which);
 
     if (which == SyscallException) {
         switch(type){
@@ -99,12 +99,15 @@ ExceptionHandler(ExceptionType which)
    	            break;
                 }
             case SC_Create:{
+                DEBUG('e',"Inicia SC_Create \n");
                 int filenameAddr = machine->ReadRegister(4);
                 char* filename = new char[128];
                 ReadStringFromUser(filenameAddr, filename);
                 fileSystem->Create(filename, 0);
                 delete filename;
                 incrementarPC();
+                DEBUG('e',"Termina SC_Create \n");
+                break;
                 }
             case SC_Read:{
                 int buffAddr = machine -> ReadRegister(4);
@@ -146,7 +149,7 @@ ExceptionHandler(ExceptionType which)
                 OpenFileId fd = machine -> ReadRegister(6);
                 char* buffer = new char[size];
                 
-                DEBUG('e',"FD %d \n",fd);
+                DEBUG('e',"entro a SC_Write con FD =  %d \n",fd);
                 
                 if (fd == ConsoleInput){
                     DEBUG('e',"Error: llamo a escribir con ConsoleInput \n");
@@ -158,7 +161,7 @@ ExceptionHandler(ExceptionType which)
                 ReadBufferFromUser(buffAddr,buffer,size);
                 
                 if (fd == ConsoleOutput){
-                    DEBUG('e',"consoleOutput \n");
+                    DEBUG('e',"en SC_Write entro a consoleOutput \n");
                     for (int i=0; i<size;i++)
                         synchConsole -> PutChar(buffer[i]);
                 } else{
@@ -208,10 +211,11 @@ ExceptionHandler(ExceptionType which)
                 
             }
             case SC_Exit:{
+                DEBUG('e',"Entro a SC_Exit");
                 int ex = machine->ReadRegister(4);
                 currentThread->setExStatus(ex);
                 currentThread->Finish();
-                incrementarPC();
+               // incrementarPC();
                 break;
             }
             case SC_Join:{
@@ -231,14 +235,21 @@ ExceptionHandler(ExceptionType which)
                 }
             }
             case SC_Exec:{
+                DEBUG('e',"EXEC: entra \n");
                 int fileAddr = machine->ReadRegister(4);
-       	        int argsAddr = machine->ReadRegister(5);
+                int cantArg = machine->ReadRegister(5);
+       	        int argsAddr = machine->ReadRegister(6);
        	        
-       	        char** args = new char* [MAX_ARGS];
+       	        char **args = new char *[cantArg+1];
        	        char* name = new char[128];
+       	        
+       	        
+       	      
+       	        ASSERT(cantArg <= MAX_ARGS);
        	        
        	        ReadStringFromUser(fileAddr, name);
        	        OpenFile *of = fileSystem->Open(name);
+       	        
        	        
        	        if(of == NULL){
        	            DEBUG('e',"Error en Exec: Open File NULL \n");
@@ -246,35 +257,43 @@ ExceptionHandler(ExceptionType which)
                     incrementarPC();
                     break;
        	            
-       	        } else { 
+       	        } else {
+       	            
        	              int i = 0, a;
            	          
-           	          if (argsAddr != 0){
-           	              for(i = 0; i < MAX_ARGS; i++){
+           	          if (cantArg != 0){
+       	        
+           	              for(i = 0; i < cantArg; i++){
                  	            machine->ReadMem(argsAddr + 4 * i, 4, &a);
                  	            if (a == 0)
-                 	              break;
+                 	              break;   
                  	            char temp[MAX_ARG_LEN];
                  	            ReadStringFromUser(a, temp);
                  	            args[i] = new char [strlen(temp) + 1];
                  	            strcpy(args[i], temp);
              	          }
              	        }
-           	          
+       	        
            	          AddrSpace *s = new AddrSpace(of);
-           	          Thread *t = new Thread(name, 0);
+           	          delete of;
+       	        
+           	          Thread *t = new Thread(name);
+           	          delete[] name;
         
            	          t->space = s;
            	          
+       	        
            	          
            	          struct Arg_WriteArgs *arguParaWriteArgs = new struct Arg_WriteArgs;
                       arguParaWriteArgs->c = i;
                       arguParaWriteArgs->v = args;
+                      
+                      
            	          
            	          t->Fork(startProc, arguParaWriteArgs);
            	          int id = processTable->AddProcess(t);
            	          machine->WriteRegister(2, id);
-           	        
+           	       
            	        incrementarPC();
            	        break;
        	        }

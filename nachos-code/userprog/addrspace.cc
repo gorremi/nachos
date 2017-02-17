@@ -87,10 +87,13 @@ AddrSpace::AddrSpace(OpenFile *executable)
 					numPages, size);
 // first, set up the translation 
     pageTable = new TranslationEntry[numPages];
+    
+    int plibre;
+    char *page;
+    
     for (i = 0; i < numPages; i++) {
 	pageTable[i].virtualPage = i;	// for now, virtual page # = phys page #
 	//pageTable[i].physicalPage = i;
-	int plibre;
 	plibre = pagLibres->Find();
 	ASSERT(plibre != -1);
 	pageTable[i].physicalPage = plibre;
@@ -100,24 +103,61 @@ AddrSpace::AddrSpace(OpenFile *executable)
 	pageTable[i].readOnly = false;  // if the code segment was entirely on 
 					// a separate page, we could set its 
 					// pages to be read-only
+    
+    
+    page = &machine->mainMemory[plibre * PageSize];
+	bzero(page, PageSize);    
+        
     }
     
 // zero out the entire address space, to zero the unitialized data segment 
 // and the stack segment
-    bzero(machine->mainMemory, size);
+    //bzero(machine->mainMemory, size);
+    
+    
 
 // then, copy in the code and data segments into memory
+    //ORIG
+    /*
     if (noffH.code.size > 0) {
         DEBUG('a', "Initializing code segment, at 0x%x, size %d\n", 
 			noffH.code.virtualAddr, noffH.code.size);
         executable->ReadAt(&(machine->mainMemory[noffH.code.virtualAddr]),
 			noffH.code.size, noffH.code.inFileAddr);
     }
+    */
+    // FIN ORIG
+    if (noffH.code.size > 0) {
+        DEBUG('a', "Initializing code segment, at 0x%x, size %d\n", 
+			noffH.code.virtualAddr, noffH.code.size);
+        
+        for(int j=0; j<noffH.code.size;j++){
+            char c;
+            executable->ReadAt(&c, 1, noffH.code.inFileAddr + j);
+            machine->mainMemory[Translate(noffH.code.virtualAddr + j)] = c;
+        }
+    }
+    
+    //ORIG
+    /*
     if (noffH.initData.size > 0) {
         DEBUG('a', "Initializing data segment, at 0x%x, size %d\n", 
 			noffH.initData.virtualAddr, noffH.initData.size);
         executable->ReadAt(&(machine->mainMemory[noffH.initData.virtualAddr]),
 			noffH.initData.size, noffH.initData.inFileAddr);
+    }
+    */
+    // FIN ORIG
+
+    if (noffH.initData.size > 0) {
+        DEBUG('a', "Initializing data segment, at 0x%x, size %d\n", 
+			noffH.initData.virtualAddr, noffH.initData.size);
+		
+		for(int j=0;j<noffH.initData.size;j++){
+		    char c;
+		    executable->ReadAt(&c, 1, noffH.initData.inFileAddr + j);
+		    machine->mainMemory[Translate(noffH.initData.virtualAddr + j)] = c;
+		}	
     }
 
 }
@@ -131,10 +171,10 @@ AddrSpace::~AddrSpace()
 {
     int i;
   
-    for (i = 0; i < (int) numPages; i++)
+    for (i = 0;i < (int) numPages; i++)
         pagLibres->Clear(pageTable[i].physicalPage); 
    
-    delete pageTable;
+    delete[] pageTable;
 }
 
 //----------------------------------------------------------------------
@@ -194,6 +234,12 @@ void AddrSpace::RestoreState()
     machine->pageTableSize = numPages;
 }
 
+int AddrSpace::Translate(int virtualAddress) {
+    int virtualPage = virtualAddress / PageSize;
+    int offset = virtualAddress % PageSize;
+    return pageTable[virtualPage].physicalPage * PageSize + offset;
+}
+
 // Para argumentos en Exec
 
 
@@ -204,6 +250,8 @@ void AddrSpace::WriteArgs(int argc,char **args){
     int *addr = new int[argc];
     int i;
     int sp = machine->ReadRegister(StackReg);
+    
+   
         
     for (i = 0; i < argc; i++){
         sp -= strlen(args[i]) + 1;
@@ -211,37 +259,35 @@ void AddrSpace::WriteArgs(int argc,char **args){
         addr[i] = sp;    
     }
     
+
     // Alineamos la pila a múltiplo de cuatro.  
     sp -= sp % 4;
     // Hacemos lugar para el arreglo y el último NULL.
-    sp -= 4 * argc + 4;
-      
+   // sp -= 4 * argc + 4;
+    sp -= 4 * argc;
+  
+    
     for (i = 0; i < argc; i++){
         machine->WriteMem(sp, 4, addr[i]);
         sp += 4;
     }
-      
-    machine->WriteMem(sp, 4, 0);
-      
+    
+    //machine->WriteMem(sp, 4, 0);
+    
     sp -= (4 * argc);
-    sp -= 16;
-    machine->WriteRegister(StackReg, sp); 
+    //sp -= 16;
+    machine->WriteRegister(StackReg, sp-16); 
     machine->WriteRegister(4, argc); 
     machine->WriteRegister(5, sp);
       
     delete[] addr;
     
     for (i = 0; i < argc; i++){
-        delete args[i];
+        delete[] args[i];
     }
-    delete args;
+    delete[] args;
 
 }
-
-
-
-
-
 
 
 

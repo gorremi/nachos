@@ -22,6 +22,10 @@ Statistics::Statistics()
     numDiskReads = numDiskWrites = 0;
     numConsoleCharsRead = numConsoleCharsWritten = 0;
     numPageFaults = numPacketsSent = numPacketsRecvd = 0;
+#ifdef DFS_TICKS_FIX
+    numBugFix = 0;
+#endif
+
 }
 
 //----------------------------------------------------------------------
@@ -33,6 +37,10 @@ Statistics::Statistics()
 void
 Statistics::Print()
 {
+#ifdef DFS_TICKS_FIX
+    printf("Ticks bug fixed %llu times!\n", numBugFix);
+    printf("WARNING: The next statistics may be invalid...\n\n");
+#endif
     printf("Ticks: total %d, idle %d, system %d, user %d\n", totalTicks, 
 	idleTicks, systemTicks, userTicks);
     printf("Disk I/O: reads %d, writes %d\n", numDiskReads, numDiskWrites);

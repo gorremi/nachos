@@ -35,6 +35,9 @@ class Statistics {
     int numPageFaults;		// number of virtual memory page faults
     int numPacketsSent;		// number of packets sent over the network
     int numPacketsRecvd;	// number of packets received over the network
+#ifdef DFS_TICKS_FIX
+    unsigned long long numBugFix;    // Number of times the ticks bug get fixed.
+#endif
 
     Statistics(); 		// initialize everything to zero
 

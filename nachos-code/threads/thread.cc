@@ -53,7 +53,7 @@ Thread::Thread(const char* threadName, bool joinable, int prio)
 #endif
 }
 
-
+/*
 Thread::Thread(const char* threadName, bool joinable)
 {
     name = threadName;
@@ -76,7 +76,7 @@ Thread::Thread(const char* threadName, bool joinable)
     
 }
 
-
+*/
 
 //----------------------------------------------------------------------
 // Thread::~Thread
@@ -99,6 +99,10 @@ Thread::~Thread()
 	DeallocBoundedArray((char *) stack, StackSize * sizeof(HostMemoryAddress));
 	
 	delete puertoJoin;
+	
+	#ifdef USER_PROGRAM
+        delete space;
+    #endif
 }
 
 //----------------------------------------------------------------------

@@ -128,6 +128,11 @@ class Interrupt {
 
     void ChangeLevel(IntStatus old, 	// SetLevel, without advancing the
 	IntStatus now);  		// simulated time
+#ifdef DFS_TICKS_FIX
+    // Restart total ticks and the pending interrupt list.
+    void RestartTicks();
+#endif
+
 };
 
 #endif // INTERRRUPT_H

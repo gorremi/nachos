@@ -86,8 +86,8 @@ class Thread {
     HostMemoryAddress machineState[MachineStateSize];	// all registers except for stackTop
 
   public:
-    Thread(const char* debugName, bool joinable, int prio);	// initialize a Thread 
-    Thread(const char* debugName, bool joinable);	
+    Thread(const char* debugName, bool joinable = true, int prio = 5);	// initialize a Thread 
+   // Thread(const char* debugName, bool joinable = true);	
     ~Thread(); 				// deallocate a Thread
 					// NOTE -- thread being deleted
 					// must not be running when delete 
