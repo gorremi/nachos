@@ -139,6 +139,7 @@ class Thread {
     
     // PARA JOIN
 		bool join;
+		bool joined;
 		Port *puertoJoin;
 		// PARA PRIORIDADES
 		int prioridad;

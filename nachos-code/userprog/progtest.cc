@@ -33,7 +33,9 @@ StartProcess(const char *filename)
     space = new AddrSpace(executable);    
     currentThread->space = space;
 
+    #ifndef DEMANDA_PURA
     delete executable;			// close file
+    #endif
 
     space->InitRegisters();		// set the initial register values
     space->RestoreState();		// load page table register

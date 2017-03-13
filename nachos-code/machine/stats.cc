@@ -22,6 +22,8 @@ Statistics::Statistics()
     numDiskReads = numDiskWrites = 0;
     numConsoleCharsRead = numConsoleCharsWritten = 0;
     numPageFaults = numPacketsSent = numPacketsRecvd = 0;
+    consultasTLB = 0;
+    aciertosTLB = 0;
 #ifdef DFS_TICKS_FIX
     numBugFix = 0;
 #endif
@@ -49,4 +51,7 @@ Statistics::Print()
     printf("Paging: faults %d\n", numPageFaults);
     printf("Network I/O: packets received %d, sent %d\n", numPacketsRecvd, 
 	numPacketsSent);
+	printf("Consultas a la TLB: %d \n",consultasTLB);
+	printf("Aciertos TLB: %d \n", aciertosTLB);
+	printf("Porcentaje de aciertos: %f \n",(aciertosTLB*100.0)/consultasTLB);
 }

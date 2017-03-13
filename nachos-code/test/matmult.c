@@ -33,6 +33,10 @@ main()
 	for (j = 0; j < Dim; j++)
             for (k = 0; k < Dim; k++)
 		 C[i][j] += A[i][k] * B[k][j];
+		 
+	Write("Fin MATMULT \n",13,1);	 
 
     Exit(C[Dim-1][Dim-1]);		/* and then we're done */
+    //Halt();
+    //Exit(0);
 }

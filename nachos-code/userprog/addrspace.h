@@ -15,6 +15,8 @@
 
 #include "copyright.h"
 #include "filesys.h"
+#include "translate.h"
+
 
 #define UserStackSize		1024 	// increase this as necessary!
 
@@ -31,9 +33,22 @@ class AddrSpace {
     void SaveState();			// Save/restore address space-specific
     void RestoreState();		// info on a context switch 
     
-    int Translate(int virtualAddress);
+    int Translate_(int virtualAddress);
     
     void WriteArgs(int argc,char **args);
+    
+    
+    TranslationEntry* ObtenerPag(int num_virt_pag);
+    
+    #ifdef DEMANDA_PURA
+    void CargarEnMemoria(int num_virt_pag);
+    #endif
+    
+    #ifdef VM
+    void CargarDesdeSwap(int num_virt_pag);
+    void EnviarASwap(int num_virt_pag);
+    int LiberarPagFisica();
+    #endif
     
 
   private:
@@ -42,6 +57,32 @@ class AddrSpace {
 					// for now!
     unsigned int numPages;		// Number of pages in the virtual 
 					// address space
+  
+    //Globales para setearlos en addrspace y poder usarlos en la carga de pag. a memoria despues
+    OpenFile *executable;
+    
+    #ifdef DEMANDA_PURA
+    
+    int noffH_code_inFileAddr;
+    int noffH_code_virtualAddr;
+    int noffH_code_size;
+    int noffH_initData_inFileAddr;
+    int noffH_initData_virtualAddr;
+    int noffH_initData_size;
+    
+    
+    // La pag. esta en memoria o hay que ir a buscarla
+    bool* enMemoria;
+    
+    #endif
+    
+    #ifdef VM
+    char* swapFileName;
+    OpenFile* swapFile;
+    bool* enSwap;
+    #endif
+    ////////////
+    
 };
 
 #endif // ADDRSPACE_H

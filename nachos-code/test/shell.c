@@ -18,7 +18,6 @@ int
 main()
 {
     SpaceId newProc;
-    SpaceId proc2;
     OpenFileId input = ConsoleInput;
     OpenFileId output = ConsoleOutput;
    // char prompt[2], ch, buffer[60], file[60];
@@ -98,6 +97,7 @@ main()
 	   } else{
 	   		newProc = Exec(file,cantidadArg,arguExec);
 	   		Join(newProc);
+	   		//Write("fin \n", 5, 1);
 	   }
 	   
 	}

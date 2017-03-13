@@ -43,6 +43,11 @@ BitMap* pagLibres;
 PostOffice *postOffice;
 #endif
 
+#ifdef VM
+CoreMap *coremap;
+List<int>* pagEnMem;
+#endif
+
 
 // External definition, to allow us to take a pointer to this function
 extern void Cleanup();
@@ -152,6 +157,7 @@ Initialize(int argc, char **argv)
 	    argCount = 2;
 	}
 #endif
+
     }
 
     DebugInit(debugArgs);			// initialize DEBUG messages
@@ -197,6 +203,12 @@ Initialize(int argc, char **argv)
 #ifdef NETWORK
     postOffice = new PostOffice(netname, rely, 10);
 #endif
+
+#ifdef VM
+    coremap = new CoreMap();
+    pagEnMem = new List<int>();
+#endif    
+
 }
 
 //----------------------------------------------------------------------
@@ -230,6 +242,12 @@ Cleanup()
 #ifdef FILESYS
     delete synchDisk;
 #endif
+
+#ifdef VM
+    delete coremap;
+    delete pagEnMem;
+#endif    
+
     
     delete timer;
     delete scheduler;

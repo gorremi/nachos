@@ -1,0 +1,47 @@
+Resultados HIT Ratio TLB
+
+1- TLB con 4 entradas
+    programa sort:
+        
+        Consultas a la TLB: 5576 
+        Aciertos TLB: 5307 
+        Porcentaje de aciertos: 95.175753 
+        
+    programa matmult:
+        
+        Consultas a la TLB: 824139 
+        Aciertos TLB: 761384 
+        Porcentaje de aciertos: 92.385386 
+        
+        
+2- TLB con 32 Entradas
+    programa sort: 
+    
+        Consultas a la TLB: 5214 
+        Aciertos TLB: 5203 
+        Porcentaje de aciertos: 99.789030
+        
+    programa matmult:
+    
+        Consultas a la TLB: 726372 
+        Aciertos TLB: 726255 
+        Porcentaje de aciertos: 99.983893 
+        
+
+3- TLB con 64 entradas
+    programa sort:
+    
+        Consultas a la TLB: 5214 
+        Aciertos TLB: 5203 
+        Porcentaje de aciertos: 99.789030 
+    
+    programa matmult:
+    
+        Consultas a la TLB: 726240 
+        Aciertos TLB: 726194 
+        Porcentaje de aciertos: 99.993666 
+        
+        
+Conclusión: Sugeriría un tamaño de 32 entradas. Ya que aumentar al doble, no marca una diferencia
+significativa en el porcentaje de aciertos.
+

@@ -35,7 +35,7 @@ CPP = /lib/cpp
 INCDIR =-I../userprog -I../threads
 CFLAGS = -G 0 -c $(INCDIR) -mips1
 
-all: halt shell matmult sort holamundo filetest filetest2 duplicaentrada a b consolaconcurrente cat cp
+all: halt shell matmult sort holamundo filetest filetest2 duplicaentrada a b consolaconcurrente cat cp vmTest1
 
 start.o: start.s ../userprog/syscall.h
 	$(CPP) $(CPPFLAGS) start.s > strt.s

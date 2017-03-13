@@ -60,10 +60,13 @@ SwapHeader (NoffHeader *noffH)
 //	"executable" is the file containing the object code to load into memory
 //----------------------------------------------------------------------
 
-AddrSpace::AddrSpace(OpenFile *executable)
+AddrSpace::AddrSpace(OpenFile *execArg)
 {
     NoffHeader noffH;
+    executable = execArg;
+    
     unsigned int i, size;
+
 
     executable->ReadAt((char *)&noffH, sizeof(noffH), 0);
     if ((noffH.noffMagic != NOFFMAGIC) && 
@@ -78,55 +81,61 @@ AddrSpace::AddrSpace(OpenFile *executable)
     numPages = divRoundUp(size, PageSize);
     size = numPages * PageSize;
 
+    #ifndef VM
     ASSERT(numPages <= NumPhysPages);		// check we're not trying
 						// to run anything too big --
 						// at least until we have
 						// virtual memory
+	#else //VM
+	
+	enSwap = new bool[numPages];
+	
+    #endif
 
     DEBUG('a', "Initializing address space, num pages %d, size %d\n", 
 					numPages, size);
 // first, set up the translation 
     pageTable = new TranslationEntry[numPages];
     
+    #ifdef DEMANDA_PURA
+    enMemoria = new bool[numPages];
+    #endif
+    
     int plibre;
     char *page;
-    
+
     for (i = 0; i < numPages; i++) {
-	pageTable[i].virtualPage = i;	// for now, virtual page # = phys page #
-	//pageTable[i].physicalPage = i;
-	plibre = pagLibres->Find();
-	ASSERT(plibre != -1);
-	pageTable[i].physicalPage = plibre;
-	pageTable[i].valid = true;
-	pageTable[i].use = false;
-	pageTable[i].dirty = false;
-	pageTable[i].readOnly = false;  // if the code segment was entirely on 
-					// a separate page, we could set its 
-					// pages to be read-only
-    
-    
-    page = &machine->mainMemory[plibre * PageSize];
-	bzero(page, PageSize);    
+    	pageTable[i].virtualPage = i;	// for now, virtual page # = phys page #
+    	//pageTable[i].physicalPage = i;
+    	#ifdef DEMANDA_PURA // SI DEMANDA PURA
+    	pageTable[i].physicalPage = -1;
+    	pageTable[i].valid = false;
+    	enMemoria[i]=false;
+    	#else // SI NO DEMANDA PURA
+    	plibre = pagLibres->Find();
+    	ASSERT(plibre != -1);
+    	pageTable[i].physicalPage = plibre;
+    	pageTable[i].valid = true;
+    	#endif //FIN DE SI NO DEMANDA PURA
+    	#ifdef VM
+    	enSwap[i]=false;
+    	#endif
+    	
+    	pageTable[i].use = false;
+    	pageTable[i].dirty = false;
+    	pageTable[i].readOnly = false;  // if the code segment was entirely on 
+    					// a separate page, we could set its 
+    					// pages to be read-only
         
+        #ifndef DEMANDA_PURA // SI NO DEMANDA PURA
+        page = &machine->mainMemory[plibre * PageSize];
+    	bzero(page, PageSize);    
+        #endif // FIN DE SI NO DEMANDA PURA 
     }
-    
-// zero out the entire address space, to zero the unitialized data segment 
-// and the stack segment
-    //bzero(machine->mainMemory, size);
-    
     
 
-// then, copy in the code and data segments into memory
-    //ORIG
-    /*
-    if (noffH.code.size > 0) {
-        DEBUG('a', "Initializing code segment, at 0x%x, size %d\n", 
-			noffH.code.virtualAddr, noffH.code.size);
-        executable->ReadAt(&(machine->mainMemory[noffH.code.virtualAddr]),
-			noffH.code.size, noffH.code.inFileAddr);
-    }
-    */
-    // FIN ORIG
+    #ifndef DEMANDA_PURA // SI NO DEMANDA PURA
+
     if (noffH.code.size > 0) {
         DEBUG('a', "Initializing code segment, at 0x%x, size %d\n", 
 			noffH.code.virtualAddr, noffH.code.size);
@@ -134,21 +143,11 @@ AddrSpace::AddrSpace(OpenFile *executable)
         for(int j=0; j<noffH.code.size;j++){
             char c;
             executable->ReadAt(&c, 1, noffH.code.inFileAddr + j);
-            machine->mainMemory[Translate(noffH.code.virtualAddr + j)] = c;
+            machine->mainMemory[Translate_(noffH.code.virtualAddr + j)] = c;
         }
     }
     
-    //ORIG
-    /*
-    if (noffH.initData.size > 0) {
-        DEBUG('a', "Initializing data segment, at 0x%x, size %d\n", 
-			noffH.initData.virtualAddr, noffH.initData.size);
-        executable->ReadAt(&(machine->mainMemory[noffH.initData.virtualAddr]),
-			noffH.initData.size, noffH.initData.inFileAddr);
-    }
-    */
-    // FIN ORIG
-
+    
     if (noffH.initData.size > 0) {
         DEBUG('a', "Initializing data segment, at 0x%x, size %d\n", 
 			noffH.initData.virtualAddr, noffH.initData.size);
@@ -156,10 +155,30 @@ AddrSpace::AddrSpace(OpenFile *executable)
 		for(int j=0;j<noffH.initData.size;j++){
 		    char c;
 		    executable->ReadAt(&c, 1, noffH.initData.inFileAddr + j);
-		    machine->mainMemory[Translate(noffH.initData.virtualAddr + j)] = c;
+		    machine->mainMemory[Translate_(noffH.initData.virtualAddr + j)] = c;
 		}	
     }
-
+    
+    #else // SI DEMANDA PURA
+    noffH_code_inFileAddr = noffH.code.inFileAddr;
+    noffH_code_virtualAddr = noffH.code.virtualAddr;
+    noffH_code_size = noffH.code.size;
+    noffH_initData_inFileAddr = noffH.initData.inFileAddr;
+    noffH_initData_virtualAddr = noffH.initData.virtualAddr;
+    noffH_initData_size = noffH.initData.size;
+    #endif // FIN DE SI DEMANDA PURA
+    
+    #ifdef VM
+    
+    int id = processTable->GetID(currentThread);
+    swapFileName = new char[128];
+    snprintf(swapFileName, 128, "SWAP.%p", this);
+    fileSystem->Create(swapFileName, size);
+    swapFile = fileSystem->Open(swapFileName);
+    
+    #endif
+    
+    
 }
 
 //----------------------------------------------------------------------
@@ -172,9 +191,27 @@ AddrSpace::~AddrSpace()
     int i;
   
     for (i = 0;i < (int) numPages; i++)
-        pagLibres->Clear(pageTable[i].physicalPage); 
-   
+        if(pageTable[i].valid){
+            pagLibres->Clear(pageTable[i].physicalPage);
+            #ifdef VM
+            coremap->Quitar(pageTable[i].physicalPage);
+            #endif
+        }
+
     delete[] pageTable;
+
+    
+    #ifdef VM
+    fileSystem->Remove(swapFileName);
+    delete[] swapFileName;
+    delete swapFile; 
+    delete[] enSwap;
+    #endif            
+    
+    #ifdef DEMANDA_PURA
+    delete[] enMemoria;
+    #endif
+   
 }
 
 //----------------------------------------------------------------------
@@ -218,7 +255,19 @@ AddrSpace::InitRegisters()
 //----------------------------------------------------------------------
 
 void AddrSpace::SaveState() 
-{}
+{
+#ifdef USE_TLB
+    int i;
+    for (i = 0; i < TLBSize; i++) {
+        TranslationEntry e= machine->tlb[i];
+        if (e.valid && e.dirty) {
+            pageTable[e.virtualPage] = e;
+            machine->tlb[i].valid=false;
+        }
+    }
+#endif
+
+}
 
 //----------------------------------------------------------------------
 // AddrSpace::RestoreState
@@ -230,18 +279,25 @@ void AddrSpace::SaveState()
 
 void AddrSpace::RestoreState() 
 {
-    machine->pageTable = pageTable;
-    machine->pageTableSize = numPages;
+#ifdef USE_TLB
+    int i;
+    for (i = 0; i<TLBSize;i++)
+        machine->tlb[i].valid=false;
+        
+#else // FIN USE_TLB
+        machine->pageTable = pageTable;
+        machine->pageTableSize = numPages;
+#endif
 }
 
-int AddrSpace::Translate(int virtualAddress) {
+int AddrSpace::Translate_(int virtualAddress) {
     int virtualPage = virtualAddress / PageSize;
     int offset = virtualAddress % PageSize;
     return pageTable[virtualPage].physicalPage * PageSize + offset;
 }
 
-// Para argumentos en Exec
 
+// Para argumentos en Exec
 
 void AddrSpace::WriteArgs(int argc,char **args){
     
@@ -289,7 +345,215 @@ void AddrSpace::WriteArgs(int argc,char **args){
 
 }
 
+// Para resolver PageFaultException
 
+TranslationEntry* AddrSpace::ObtenerPag(int num_virt_pag)
+{
+    DEBUG('v', "Necesita la PAG virtual %d \n",num_virt_pag);
+    
+    #ifdef DEMANDA_PURA
+    if(!enMemoria[num_virt_pag]){
+        #ifdef VM
+            if(!enSwap[num_virt_pag])
+                CargarEnMemoria(num_virt_pag);
+            else
+                CargarDesdeSwap(num_virt_pag);
+        #else
+        CargarEnMemoria(num_virt_pag);
+        #endif
+        
+    }
+    #endif    
+    
+    ASSERT(pageTable[num_virt_pag].virtualPage == num_virt_pag  );
+    return &pageTable[num_virt_pag]; 
+    
+}
+
+
+#ifdef DEMANDA_PURA // SI DEMANDA PURA
+
+void AddrSpace::CargarEnMemoria(int num_virt_pag) {
+    
+    int virt_Addr;
+    virt_Addr = num_virt_pag * PageSize;
+    
+    int plibre;
+    
+    plibre = pagLibres->Find();
+    
+    if (plibre == -1){
+        #ifdef VM
+        plibre = LiberarPagFisica();
+        pagLibres->Mark(plibre);
+        #else
+        ASSERT(false);
+        #endif
+    } 
+    
+    pageTable[num_virt_pag].physicalPage = plibre;  
+    
+    #ifdef VM
+    coremap->Agregar(pageTable[num_virt_pag].physicalPage,num_virt_pag,this);
+    pagEnMem->Append(pageTable[num_virt_pag].physicalPage);
+    #endif
+   
+    DEBUG('v', "Carga la pag. virtual %d en memoria \n", num_virt_pag);
+
+    if (noffH_code_size > 0) {
+        executable->ReadAt(&(machine->mainMemory[Translate_(virt_Addr)]), PageSize,noffH_code_inFileAddr + virt_Addr - noffH_code_virtualAddr);
+    } 
+
+    if (noffH_initData_size > 0) {
+        executable->ReadAt(&(machine->mainMemory[Translate_(virt_Addr)]), PageSize, noffH_initData_inFileAddr + virt_Addr - noffH_initData_virtualAddr);
+    }
+    
+    DEBUG('v', "Fin de Carga la pag. en memoria \n");
+    
+    pageTable[num_virt_pag].valid = true;
+    enMemoria[num_virt_pag] = true;
+    pageTable[num_virt_pag].virtualPage = num_virt_pag; 
+    
+}
+
+#endif
+
+#ifdef VM
+
+/*
+
+REMPLAZO DE PAG. FISICA CON FIFO:
+
+int AddrSpace::LiberarPagFisica(){
+    DEBUG('v', "Tiene que liberar una pag de memoria \n");
+    int pagAeliminar,pagVirtual;
+    AddrSpace* procSpace;
+    
+    pagAeliminar = pagEnMem->Remove();
+
+    pagVirtual = coremap->PaginaVirtual(pagAeliminar);
+    procSpace = coremap->ProcSpace(pagAeliminar);
+
+    procSpace->EnviarASwap(pagVirtual);
+    bzero(machine->mainMemory+pagAeliminar*PageSize,PageSize);
+    
+    DEBUG('v', "libera PAG FISICA %d \n",pagAeliminar);
+    return pagAeliminar;
+}
+
+*/ 
+
+// REMPLAZO DE PG. FISICA CON ALGORITMO DE SGUNDA OPORTUNIDAD MEJORADA:
+
+int AddrSpace::LiberarPagFisica(){
+    DEBUG('v', "Tiene que liberar una pag de memoria \n");
+    int pagAeliminar,pagVirtual;
+    AddrSpace* procSpace;
+    
+    int vuelta ;
+    for (vuelta = 1; vuelta <=4; vuelta++ ){
+        for (int i =0; i<NumPhysPages; i++){
+            pagAeliminar = pagEnMem->Remove();
+            
+            bool use = pageTable[coremap->PaginaVirtual(pagAeliminar)].use;
+            bool dirty = pageTable[coremap->PaginaVirtual(pagAeliminar)].dirty;
+            if ((vuelta == 1) && !use && !dirty )
+                break;
+            if ((vuelta == 2) && !use && dirty )
+                break;
+            if ((vuelta == 3) && use && !dirty )
+                break;    
+            if ((vuelta == 4) && use && dirty )
+                break;  
+            
+            pagEnMem->Prepend(pagAeliminar);
+        }
+            
+    }
+
+    pagVirtual = coremap->PaginaVirtual(pagAeliminar);
+    procSpace = coremap->ProcSpace(pagAeliminar);
+
+    procSpace->EnviarASwap(pagVirtual);
+    bzero(machine->mainMemory+pagAeliminar*PageSize,PageSize);
+    
+    DEBUG('v', "libera PAG FISICA %d \n",pagAeliminar);
+    return pagAeliminar;
+}
+
+
+
+
+
+
+
+
+void AddrSpace::EnviarASwap(int num_virt_pag){
+    
+    DEBUG('v', "Envía a PAG VIRTUAL %d a Swap \n", num_virt_pag);
+    
+    int pagFisica, dirFisica, dirVirtual;
+    pagFisica = pageTable[num_virt_pag].physicalPage;
+    dirFisica= pagFisica * PageSize;
+    dirVirtual = num_virt_pag * PageSize;
+    
+    swapFile->WriteAt(&(machine->mainMemory[dirFisica]), PageSize, dirVirtual);
+    
+    pagLibres->Clear(pagFisica);
+    coremap->Quitar(pagFisica);
+    
+    pageTable[num_virt_pag].valid=false;
+    pageTable[num_virt_pag].physicalPage=-1;
+    
+    
+    for(int i=0;i<TLBSize;i++)
+        if(machine->tlb[i].physicalPage == pagFisica){
+            machine->tlb[i].valid=false;
+            break;
+        }
+            
+    enSwap[num_virt_pag]=true;
+    enMemoria[num_virt_pag]=false;
+    
+}
+
+
+void AddrSpace::CargarDesdeSwap(int num_virt_pag){
+    
+    DEBUG('v', "Trae la PAG VIRTUAL %d desde Swap \n",num_virt_pag);
+    
+    int pagFisica, dirFisica, dirVirtual;
+    
+    dirVirtual = num_virt_pag * PageSize;
+    
+    int plibre;
+    plibre = pagLibres->Find();
+    
+    if (plibre == -1)
+        plibre = LiberarPagFisica();
+    
+    
+    pagFisica = plibre;
+    dirFisica = pagFisica * PageSize;
+    
+    pageTable[num_virt_pag].physicalPage = pagFisica;
+    ASSERT(pageTable[num_virt_pag].physicalPage < 32);
+    
+    pagLibres->Mark(plibre);
+    
+    coremap->Agregar(pagFisica, num_virt_pag, this);
+    
+    swapFile->ReadAt(&(machine->mainMemory[dirFisica]), PageSize, dirVirtual);
+
+    
+    pageTable[num_virt_pag].valid=true;
+    pagEnMem->Append(pagFisica);
+    
+    enMemoria[num_virt_pag]=true;
+    enSwap[num_virt_pag]=false;
+}
+
+#endif
 
 
 

@@ -56,4 +56,10 @@ extern SynchDisk   *synchDisk;
 extern PostOffice* postOffice;
 #endif
 
+#ifdef VM
+#include "coremap.h"
+extern CoreMap *coremap;
+extern List<int>* pagEnMem;
+#endif
+
 #endif // SYSTEM_H

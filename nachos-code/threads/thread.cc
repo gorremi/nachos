@@ -39,6 +39,7 @@ Thread::Thread(const char* threadName, bool joinable, int prio)
     stack = NULL;
     status = JUST_CREATED;
     join = joinable;
+    joined = false;
     puertoJoin = new Port("puerto join");
     prioridad=prio;
     prioridadOriginal=prio;
@@ -190,14 +191,14 @@ Thread::Finish ()
     interrupt->SetLevel(IntOff);		
     ASSERT(this == currentThread);
     
-    if (join)
+    if (join & joined)
         puertoJoin->Send(exitStatus);
     DEBUG('t', "Finishing thread \"%s\"\n", getName());
     
 #ifdef USER_PROGRAM
     int id = processTable->GetID(this);
     processTable->RemoveProcess(id);
-#endif    
+#endif
     
     threadToBeDestroyed = currentThread;
     Sleep();					// invokes SWITCH
@@ -272,8 +273,7 @@ Thread::Sleep ()
     status = BLOCKED;
     while ((nextThread = scheduler->FindNextToRun()) == NULL) {
 	interrupt->Idle();	// no one to run, wait for an interrupt
-    }
-        
+    } 
     scheduler->Run(nextThread); // returns when we've been signalled
 }
 
@@ -366,6 +366,7 @@ void
 Thread::Join()
 {
     ASSERT(join);
+    joined = true;
     int i;
     puertoJoin->Receive(&i);
 }

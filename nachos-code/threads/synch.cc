@@ -223,7 +223,7 @@ void Port::Send(int mensaje)
 	puedeLeer = true;
 	cond_send->Signal();
 	while(!leido)
-		cond_receive->Wait();
+		cond_receive->Wait();	
 	leido = false;
     puerto_lock->Release();
 }

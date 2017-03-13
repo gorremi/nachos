@@ -106,7 +106,6 @@ ExceptionHandler(ExceptionType which)
                 fileSystem->Create(filename, 0);
                 delete filename;
                 incrementarPC();
-                DEBUG('e',"Termina SC_Create \n");
                 break;
                 }
             case SC_Read:{
@@ -183,7 +182,6 @@ ExceptionHandler(ExceptionType which)
             case SC_Open:{
                 int fileAddr = machine->ReadRegister(4);
                 char* name = new char[128];
-                
                 ReadStringFromUser(fileAddr, name);
                 
                 OpenFile* of = fileSystem->Open(name);
@@ -211,7 +209,7 @@ ExceptionHandler(ExceptionType which)
                 
             }
             case SC_Exit:{
-                DEBUG('e',"Entro a SC_Exit");
+                DEBUG('e',"Entro a SC_Exit \n");
                 int ex = machine->ReadRegister(4);
                 currentThread->setExStatus(ex);
                 currentThread->Finish();
@@ -219,6 +217,7 @@ ExceptionHandler(ExceptionType which)
                 break;
             }
             case SC_Join:{
+                DEBUG('e',"Entra a SC_Join \n");
                 int id = machine->ReadRegister(4);
                 Thread* thread = processTable->GetProcess(id);
                 if(thread == NULL){
@@ -227,9 +226,9 @@ ExceptionHandler(ExceptionType which)
                     incrementarPC();
                     break;
                 } else{
+                    thread->Join();
                     int ex = thread->getExStatus();
                     machine->WriteRegister(2, ex);
-                    thread->Join();
                     incrementarPC();
                     break;
                 }
@@ -243,11 +242,10 @@ ExceptionHandler(ExceptionType which)
        	        char **args = new char *[cantArg+1];
        	        char* name = new char[128];
        	        
-       	        
-       	      
        	        ASSERT(cantArg <= MAX_ARGS);
        	        
        	        ReadStringFromUser(fileAddr, name);
+       	        
        	        OpenFile *of = fileSystem->Open(name);
        	        
        	        
@@ -258,11 +256,8 @@ ExceptionHandler(ExceptionType which)
                     break;
        	            
        	        } else {
-       	            
        	              int i = 0, a;
-           	          
            	          if (cantArg != 0){
-       	        
            	              for(i = 0; i < cantArg; i++){
                  	            machine->ReadMem(argsAddr + 4 * i, 4, &a);
                  	            if (a == 0)
@@ -275,7 +270,11 @@ ExceptionHandler(ExceptionType which)
              	        }
        	        
            	          AddrSpace *s = new AddrSpace(of);
+           	          
+           	          #ifndef DEMANDA_PURA
            	          delete of;
+           	          #endif
+       	        
        	        
            	          Thread *t = new Thread(name);
            	          delete[] name;
@@ -300,10 +299,41 @@ ExceptionHandler(ExceptionType which)
             }
             
         }
-    } else {
-	printf("Unexpected user mode exception %d %d\n", which, type);
-	ASSERT(false);
-    }
+    } else if (which == PageFaultException) {
+        DEBUG('v',"PageFaultException \n");
+        int num_vir_pag = (machine->ReadRegister(BadVAddrReg)) / PageSize;
+        int i;
+
+        TranslationEntry* e = currentThread->space->ObtenerPag(num_vir_pag);
+        
+        for (i = 0; i < TLBSize; i++) {
+            if (!machine->tlb[i].valid) {
+                break;
+            }
+        }
+
+        if (i == TLBSize) { //no hay entrada libre
+            i = rand() % TLBSize; //seleccionar una entrada para reemplazar
+        }
+
+        machine->tlb[i].virtualPage = e->virtualPage;
+        machine->tlb[i].physicalPage = e->physicalPage;
+        
+        if(e->physicalPage == -1){
+            ASSERT(false);
+        }
+        machine->tlb[i].valid = true;
+        machine->tlb[i].use = e->use;
+        machine->tlb[i].dirty = e->dirty;
+        machine->tlb[i].readOnly = e->readOnly; 
+        
+        } else if (which == ReadOnlyException) {
+            	printf("ReadOnlyException\n");
+            ASSERT(false);
+            } else {
+            	printf("Unexpected user mode exception %d %d\n", which, type);
+            	ASSERT(false);
+             }
 }
 
 
